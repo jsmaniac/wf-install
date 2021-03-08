@@ -8,6 +8,8 @@ print_help() {
     echo "                           Default is master"
     echo "  -p, --prefix=<prefix>  Prefix where to install Wayfire. Default: /opt/wayfire"
     echo "  --system-wlroots       Use the system-wide installation of wlroots instead of the bundled one."
+    echo "  -y                     Run in non-interactive mode (install everything) without overwriting ~/.config/wayfire.ini nor ~/.config/wf-shell.ini if they exist"
+    echo "  -Y                     Run in non-interactive mode (install everything), will use cp --backup=numbered to backup the existing ~/.config/wayfire.ini to ~/.config/wayfire.ini.~NUMBER~ if it already exists, same for ~/.config/wf-shell.ini"
     exit 1
 }
 
@@ -15,13 +17,15 @@ print_help() {
 # Parse arguments
 VERBOSE=0
 CLEANBUILD=0
+NON_INTERACTIVE=0
+NON_INTERACTIVE_SAFE_REPLACE_INI=0
 PREFIX=/opt/wayfire
 STREAM=master
 USE_SYSTEM_WLROOTS=disabled
 
 # Temporarily disable exit on error
 set +e
-options="$(getopt -o hvcs:p: --long verbose --long clean --long stream: --long prefix: --long system-wlroots -- "$@")"
+options="$(getopt -o hvcyYs:p: --long verbose --long clean --long stream: --long prefix: --long system-wlroots -- "$@")"
 ERROR_CODE="$?"
 set -e
 
@@ -53,6 +57,14 @@ while true; do
         --system-wlroots)
             USE_SYSTEM_WLROOTS=enabled
             ;;
+        -y)
+            NON_INTERACTIVE=1
+            NON_INTERACTIVE_SAFE_REPLACE_INI=0
+            ;;
+        -Y)
+            NON_INTERACTIVE=1
+            NON_INTERACTIVE_SAFE_REPLACE_INI=1
+            ;;
         -h|--help)
             print_help
             exit;;
@@ -72,14 +84,18 @@ echo "Installation prefix: $PREFIX"
 
 BUILDROOT="$(cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P)"
 function ask_confirmation {
-    while true; do
-        read -p "$1" yn
-        case "$yn" in
-            [Yy]* ) yn=Y; break;;
-            [Nn]* ) yn=N; break;;
-            * ) echo "Please answer yes or no.";;
-        esac
-    done
+    if test "${NON_INTERACTIVE}" = 1; then
+        yn=Y
+    else
+        while true; do
+            read -p "$1" yn
+            case "$yn" in
+                [Yy]* ) yn=Y; break;;
+                [Nn]* ) yn=N; break;;
+                * ) echo "Please answer yes or no.";;
+            esac
+        done
+    fi
 }
 
 # Usually we use sudo, but if prefix is somewhere in ~/, we don't need sudo
@@ -142,14 +158,22 @@ function install_config {
     fi
 
     if [ -f "${DEFAULT_CONFIG_PATH}" ]; then
-        ask_confirmation "Do you want to override the existing config file ${DEFAULT_CONFIG_PATH} [y/n]? "
+        if test "${NON_INTERACTIVE}" = 1; then
+            if "${NON_INTERACTIVE_SAFE_REPLACE_INI}" = 1; then
+                yn=Y
+            else
+                yn=N
+            fi
+        else
+            ask_confirmation "Do you want to override the existing config file ${DEFAULT_CONFIG_PATH} [y/n]? "
+        fi
     else
         yn=Y
     fi
 
     if [ "$yn" = Y ]; then
         mkdir -p "$(dirname "${DEFAULT_CONFIG_PATH}")"
-        cp "${CONFIG_FILE}" "${DEFAULT_CONFIG_PATH}" --backup=t
+        cp --backup=numbered "${CONFIG_FILE}" "${DEFAULT_CONFIG_PATH}"
     fi
 }
 
