@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -e
+set -x
 print_help() {
     echo "Usage:"
     echo "  -v, --verbose          Verbose output."
