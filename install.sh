@@ -159,7 +159,7 @@ function install_config {
 
     if [ -f "${DEFAULT_CONFIG_PATH}" ]; then
         if test "${NON_INTERACTIVE}" = 1; then
-            if "${NON_INTERACTIVE_SAFE_REPLACE_INI}" = 1; then
+            if test "${NON_INTERACTIVE_SAFE_REPLACE_INI}" = 1; then
                 yn=Y
             else
                 yn=N
